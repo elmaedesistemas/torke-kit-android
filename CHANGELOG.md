@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0 · 2026-11-22
+
+Track tools: Christmas tree, lap timer and geofences, phone-only. Same results as TorkeKit for iOS
+0.4.0, checked with shared fixtures (`circuit.torkerun.json`, `phase4-expected.json`).
+
+- `ChristmasTree` (`TreeType.pro`, `sportsman`): the lights on the samples' clock, `lit(time)`, a
+  seeded random auto-start, and `RunResult.reaction(tree)`, `leftStageAt` and `packageTime(tree)`.
+- `LapTimer` with `TimingLine`s: laps, sectors, `delta` against the best lap and `predictedLap`.
+- `Geofence` (circle or polygon, JSON), `TorkeRun.check(geofence)` (`GeofenceCheck`),
+  `firstContaining` and `Geo` (haversine distance, local projection).
+
 ## 0.3.0 · 2026-11-22
 
 Validation against timeslips and the most from the phone's GPS. Same results as TorkeKit for iOS 0.3.0,

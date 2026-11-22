@@ -37,13 +37,13 @@ dependencyResolutionManagement {
 
 // build.gradle.kts of the app
 dependencies {
-    implementation("com.github.elmaedesistemas.torke-kit-android:torke-kit-sensors:0.3.0")
+    implementation("com.github.elmaedesistemas.torke-kit-android:torke-kit-sensors:0.4.0")
     // Only the core, without Android (a server, tests):
-    // implementation("com.github.elmaedesistemas.torke-kit-android:torke-kit:0.3.0")
+    // implementation("com.github.elmaedesistemas.torke-kit-android:torke-kit:0.4.0")
 }
 ```
 
-Tags have no `v`, as on iOS: `0.1.0`, `0.2.0`, `0.3.0`…
+Tags have no `v`, as on iOS: `0.1.0`, `0.2.0`, `0.3.0`, `0.4.0`…
 
 ## Use
 
@@ -131,6 +131,27 @@ val change = SetupChange.between(before, after)     // to read next to the 60 ft
 ```
 
 `x` is forward of the rear axle centerline, `y` up from the ground, in inches or centimeters.
+
+### Track tools
+
+A Christmas tree on the screen with the reaction time from the stage beam, a lap timer for road
+courses with sectors and a live delta, and geofences to decide where a run counts.
+
+```kotlin
+// Christmas tree: schedule the lights when the car is armed, measure the reaction after
+val tree = ChristmasTree.start(TreeType.pro, stagedAt = SystemClock.elapsedRealtimeNanos() / 1e9)
+tree.lights                                   // amber1…3 and green, on the samples' clock
+result.reaction(tree)                         // .time (negative: red light), .isPerfect
+
+// Lap timer: feed it every GPS fix
+val timer = LapTimer(TimingLine(edgeA, edgeB), listOf(split1, split2))
+timer.process(fix).forEach { /* Started, Sector, Completed */ }
+timer.delta; timer.predictedLap; timer.bestLap
+
+// Geofences: where the run counts
+val strip = Geofence.circle(Coordinate(9.9412, -84.2005), 400.0)
+run.check(strip)                              // startInside, shareInside, allInside
+```
 
 ### Validation against timeslips
 
