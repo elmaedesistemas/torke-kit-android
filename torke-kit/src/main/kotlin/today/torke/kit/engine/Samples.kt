@@ -79,6 +79,8 @@ public object DragDistance {
     /** 1 foot: the rollout tracks discount before the timers start. */
     public const val ROLLOUT: Double = 0.3048
     public const val SIXTY_FEET: Double = 18.288
+    /** 330 feet, an intermediate mark on most timeslips. */
+    public const val THREE_THIRTY_FEET: Double = 100.584
     public const val EIGHTH_MILE: Double = 201.168
     public const val QUARTER_MILE: Double = 402.336
     /** 100 km/h in m/s. */

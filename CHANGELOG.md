@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0 · 2026-11-22
+
+Validation against timeslips and the most from the phone's GPS. Same results as TorkeKit for iOS 0.3.0,
+checked with shared fixtures (`validation.json`, `validation-expected.json`).
+
+- `torke-validate`: `Timeslip`, `RunComparison`, `ValidationReport` (bias, mean absolute error, RMS and
+  worst case per mark, against `ValidationTargets`), `TorkeRun.compare(timeslip)` and the `torke.validation`
+  JSON (`ValidationSet`). The `torke-validate` command: `./gradlew :torke-validate:installDist`.
+- `DragDistance.THREE_THIRTY_FEET` (330 ft).
+- `RunSnapshot.gpsRate`: GPS fixes per second over the last 5 s.
+- `torke-kit-sensors`: full GNSS tracking on Android 12+ (`PhoneSensorProvider(context, fullTracking)`),
+  satellites and signal (`PhoneSensorProvider.gnss`, `GnssInfo`) and `PhoneBarometer`.
+
 ## 0.2.0 · 2026-11-21
 
 More measurements, run quality and suspension geometry. Same results as TorkeKit for iOS 0.2.0,

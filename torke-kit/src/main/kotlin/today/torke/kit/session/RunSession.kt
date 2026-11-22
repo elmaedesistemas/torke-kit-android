@@ -207,6 +207,7 @@ public class RunSession(public var options: RunSessionOptions = RunSessionOption
     }
 
     public fun process(sample: GPSSample): List<RunEvent> {
+        trackRate(sample.t)
         var next = state
         sample.horizontalAccuracy?.let { next = next.copy(gpsAccuracy = it) }
         sample.coordinate?.let { next = next.copy(location = it) }
@@ -243,6 +244,16 @@ public class RunSession(public var options: RunSessionOptions = RunSessionOption
         gps.add(sample)
         events.forEach(::emit)
         return events
+    }
+
+    /** Fix times of the last few seconds, for [RunSnapshot.gpsRate]. */
+    private val fixTimes = ArrayDeque<Double>()
+
+    private fun trackRate(t: Double) {
+        fixTimes.addLast(t)
+        while (fixTimes.first() < t - 5) fixTimes.removeFirst()
+        val first = fixTimes.first()
+        if (fixTimes.size >= 2 && t > first) state = state.copy(gpsRate = (fixTimes.size - 1) / (t - first))
     }
 
     private fun emit(event: RunEvent) {
@@ -287,6 +298,6 @@ public class RunSession(public var options: RunSessionOptions = RunSessionOption
         passed.clear()
         recordedAt = null
         movementStart = null
-        state = RunSnapshot(speed = state.speed, gpsAccuracy = state.gpsAccuracy, location = state.location)
+        state = RunSnapshot(speed = state.speed, gpsAccuracy = state.gpsAccuracy, location = state.location, gpsRate = state.gpsRate)
     }
 }

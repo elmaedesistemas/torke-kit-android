@@ -18,3 +18,4 @@ rootProject.name = "torke-kit-android"
 
 include(":torke-kit")
 include(":torke-kit-sensors")
+include(":torke-validate")

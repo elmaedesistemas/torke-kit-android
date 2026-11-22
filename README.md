@@ -17,7 +17,8 @@ has the same API, the same results and reads the same files.
 | Module | What it has | Depends on |
 | --- | --- | --- |
 | `torke-kit` | Engine, `RunSession`, `torke.run` format, `RecordedRunProvider`, `DemoRun` | Kotlin (JVM), coroutines, kotlinx.serialization |
-| `torke-kit-sensors` | `PhoneSensorProvider` (SensorManager + LocationManager) | Android, `minSdk 26` |
+| `torke-kit-sensors` | `PhoneSensorProvider` (SensorManager + LocationManager), `PhoneBarometer` | Android, `minSdk 26` |
+| `torke-validate` | The validation command | Java 17 |
 
 `torke-kit` has no Android code, so it also runs on a server, for example to analyze uploaded
 runs again.
@@ -36,13 +37,13 @@ dependencyResolutionManagement {
 
 // build.gradle.kts of the app
 dependencies {
-    implementation("com.github.elmaedesistemas.torke-kit-android:torke-kit-sensors:0.2.0")
+    implementation("com.github.elmaedesistemas.torke-kit-android:torke-kit-sensors:0.3.0")
     // Only the core, without Android (a server, tests):
-    // implementation("com.github.elmaedesistemas.torke-kit-android:torke-kit:0.2.0")
+    // implementation("com.github.elmaedesistemas.torke-kit-android:torke-kit:0.3.0")
 }
 ```
 
-Tags have no `v`, as on iOS: `0.1.0`, `0.2.0`…
+Tags have no `v`, as on iOS: `0.1.0`, `0.2.0`, `0.3.0`…
 
 ## Use
 
@@ -131,12 +132,48 @@ val change = SetupChange.between(before, after)     // to read next to the 60 ft
 
 `x` is forward of the rear axle centerline, `y` up from the ground, in inches or centimeters.
 
+### Validation against timeslips
+
+How far TorkeKit is from the track's timer: each run is analyzed again and compared, mark by mark,
+with its timeslip. Many runs give the bias, the typical error (RMS) and the worst case per mark.
+
+```kotlin
+val slip = Timeslip(sixtyFeet = 2.12, quarterMile = 12.91, quarterMileSpeed = 114.2, speedUnit = SpeedUnit.mph)
+val comparison = run.compare(slip)                 // measured, reference and error per mark
+val report = ValidationReport.of(listOf(ValidationInput("Run 1", run.analyze(), slip)))
+report.summaries                                   // bias, meanAbsolute, rms, worst, passed
+```
+
+The same from the terminal, on any computer with Java 17, with a `torke.validation` JSON listing
+runs and timeslips (see `Fixtures/validation.json`):
+
+```bash
+./gradlew :torke-validate:installDist
+torke-validate/build/install/torke-validate/bin/torke-validate Fixtures/validation.json --runs
+torke-validate/build/install/torke-validate/bin/torke-validate my-run.torkerun.json --60ft 2.12 --1/4 12.91 --1/4-speed 114.2 --mph
+```
+
+It exits with 0 when every mark is within its target (60 ft ±0.10 s, 1/4 mile ±0.15 s, trap speed
+±3 km/h), so it fits in CI.
+
+### The phone's GPS and barometer
+
+- `session.snapshot.gpsRate` is how many fixes per second the GPS really gives: 1 on most phones,
+  5–10 on some.
+- On Android 12+, `PhoneSensorProvider` keeps the GNSS chip in full tracking (no power-saving gaps)
+  while it records; `PhoneSensorProvider(context, fullTracking = false)` turns it off.
+- `phone.gnss` (`StateFlow<GnssInfo?>`): satellites used, in view and their mean signal (C/N0).
+- `PhoneBarometer(context).stationPressureHpa()` reads the station pressure for `Weather`.
+
+TorkeKit is phone-only by design: no external receivers or other hardware.
+
 ## Accuracy
 
 The tests simulate runs with exact physics and check the targets: ±0.15 s on the 1/4 mile,
 ±0.10 s on 60 ft and ±0.20 s on 0–100 km/h, with a 1 Hz phone GPS, sensor noise and a tilted
 mount. They also read `Fixtures/demo-42.torkerun.json`, written by TorkeKit for iOS, and must
-get the same times. Validation against dragstrip timeslips is on the [roadmap](docs/ROADMAP.md).
+get the same times. To check it against real runs, use
+[`torke-validate`](#validation-against-timeslips) with your timeslips.
 
 ## Development
 

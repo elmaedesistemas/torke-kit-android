@@ -83,6 +83,8 @@ public data class RunSnapshot(
     val result: RunResult? = null,
     /** The result of a rolling or braking run, once [phase] is [RunPhase.Finished]. */
     val interval: IntervalResult? = null,
+    /** GPS fixes per second over the last few seconds: 1 on most phones, up to 10 on some. Null until two fixes arrive. */
+    val gpsRate: Double? = null,
 ) {
     val speedKmh: Double get() = speed * 3.6
 }
