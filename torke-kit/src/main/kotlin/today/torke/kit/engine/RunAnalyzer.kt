@@ -14,7 +14,12 @@ public object RunAnalyzer {
     private const val STILL_WINDOW = 1.0
 
     /** Analyzes a recorded run. Returns null when there is no launch from a standstill. */
-    public fun analyze(motion: List<MotionSample>, gps: List<GPSSample>): RunResult? {
+    public fun analyze(
+        motion: List<MotionSample>,
+        gps: List<GPSSample>,
+        /** The trace stops this far past the launch: raise it to read marks past the 1/4, such as [DragDistance.HALF_MILE]. */
+        stopDistance: Double = DragDistance.QUARTER_MILE + 20,
+    ): RunResult? {
         val sorted = motion.sortedBy { it.t }
         val (launchIndex, bias) = findLaunch(sorted) ?: return null
         val launchTime = sorted[launchIndex].t
@@ -26,6 +31,7 @@ public object RunAnalyzer {
         var lastSpeed = 0.0
         var lastT = launchTime
         filter.predict(sorted[launchIndex])
+        val g = GForce()
 
         for (i in launchIndex + 1 until sorted.size) {
             val sample = sorted[i]
@@ -33,10 +39,11 @@ public object RunAnalyzer {
             while (gpsQueue.isNotEmpty() && gpsQueue.first().t <= sample.t) filter.correct(gpsQueue.removeFirst())
             val speed = max(filter.speed, 0.0)
             distance += (speed + lastSpeed) / 2 * (sample.t - lastT)
+            g.add(sample.accel - filter.bias, sample.t - lastT, sample.t - launchTime)
             lastSpeed = speed
             lastT = sample.t
             trace.add(TracePoint(sample.t - launchTime, speed, distance))
-            if (distance > DragDistance.QUARTER_MILE + 20) break
+            if (distance > stopDistance) break
         }
 
         val rolloutT = timeAtDistance(DragDistance.ROLLOUT, trace)
@@ -55,7 +62,24 @@ public object RunAnalyzer {
             topSpeedKmh = (trace.maxOfOrNull { it.speed } ?: 0.0) * 3.6,
             accelBias = filter.bias,
             trace = trace,
+            launchG = g.launch,
+            peakG = g.peak,
         )
+    }
+
+    /** Forward acceleration averaged over 0.1 s, in g: the peak in the first second and overall. */
+    internal class GForce {
+        private var smooth = 0.0
+        var launch: Double? = null
+        var peak: Double? = null
+
+        fun add(accel: Double, dt: Double, elapsed: Double) {
+            if (dt <= 0 || dt >= 0.5) return
+            smooth += (accel - smooth) * minOf(1.0, dt / 0.1)
+            val g = smooth / DragDistance.G
+            if (elapsed <= 1) launch = maxOf(launch ?: 0.0, g)
+            peak = maxOf(peak ?: 0.0, g)
+        }
     }
 
     /**

@@ -8,5 +8,5 @@ plugins {
 // JitPack publishes every module as com.github.elmaedesistemas.torke-kit-android:<module>:<tag>.
 allprojects {
     group = "today.torke.kit"
-    version = "0.1.0"
+    version = "0.2.0"
 }

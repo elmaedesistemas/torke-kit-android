@@ -56,6 +56,8 @@ public data class GPSSample(
     val longitude: Double? = null,
     /** Horizontal accuracy of the position, in meters. */
     val horizontalAccuracy: Double? = null,
+    /** Height above sea level, in meters. Used to check the slope of the strip. */
+    val altitude: Double? = null,
 ) {
     /** Fixes with [speedAccuracy] of [NO_SPEED] or more carry a position but no speed. */
     val hasSpeed: Boolean get() = speedAccuracy < NO_SPEED
@@ -81,6 +83,13 @@ public object DragDistance {
     public const val QUARTER_MILE: Double = 402.336
     /** 100 km/h in m/s. */
     public const val SPEED_100: Double = 100.0 / 3.6
+    /** 1000 feet, the distance of nitro classes. */
+    public const val THOUSAND_FEET: Double = 304.8
+    public const val HALF_MILE: Double = 804.672
+    /** 60 mph in m/s. */
+    public const val SPEED_60_MPH: Double = 60 * 0.44704
+    /** Standard gravity, m/s². */
+    public const val G: Double = 9.80665
 }
 
 /** The marks a drag run is timed at. */
@@ -109,6 +118,10 @@ public data class RunResult(
     /** Accelerometer bias the filter ended with (m/s²): large values mean a loose mount. */
     val accelBias: Double,
     val trace: List<TracePoint> = emptyList(),
+    /** Highest forward acceleration in the first second after the launch, in g (0.1 s average). */
+    val launchG: Double? = null,
+    /** Highest forward acceleration of the run, in g (0.1 s average). */
+    val peakG: Double? = null,
 ) {
     /** The time shown big: the longest distance the run covered. */
     val headline: Pair<DragMark, Double>?

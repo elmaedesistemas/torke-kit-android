@@ -3,7 +3,13 @@ package today.torke.kit.format
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import today.torke.kit.analysis.RunQuality
+import today.torke.kit.analysis.Weather
 import today.torke.kit.engine.AxisCalibration
+import today.torke.kit.engine.DragDistance
+import today.torke.kit.engine.IntervalAnalyzer
+import today.torke.kit.engine.IntervalResult
+import today.torke.kit.suspension.SuspensionSetup
 import today.torke.kit.engine.Coordinate
 import today.torke.kit.engine.GPSSample
 import today.torke.kit.engine.RawMotionSample
@@ -27,9 +33,25 @@ public data class TorkeRun(
     val motion: List<RawMotionSample> = emptyList(),
     val gps: List<GPSSample> = emptyList(),
     val result: RunResult? = null,
+    /** The result of a rolling or braking run. */
+    val interval: IntervalResult? = null,
+    /** Weather at the strip, for corrected times. */
+    val weather: Weather? = null,
+    /** The vehicle's suspension when the run was made, to compare setups. */
+    val suspension: SuspensionSetup? = null,
 ) {
     /** Computes the times again from the raw samples. */
-    public fun analyze(): RunResult? = RunAnalyzer.analyze(AxisCalibration.forwardAccel(motion), gps)
+    public fun analyze(stopDistance: Double = DragDistance.QUARTER_MILE + 20): RunResult? =
+        RunAnalyzer.analyze(AxisCalibration.forwardAccel(motion), gps, stopDistance)
+
+    /** A rolling interval, such as 60–130 km/h, from the raw samples. */
+    public fun rolling(fromKmh: Double = 60.0, toKmh: Double = 130.0): IntervalResult? = IntervalAnalyzer.rolling(motion, gps, fromKmh, toKmh)
+
+    /** A braking, such as 100–0 km/h, from the raw samples. */
+    public fun braking(fromKmh: Double = 100.0): IntervalResult? = IntervalAnalyzer.braking(motion, gps, fromKmh)
+
+    /** How much the run can be trusted. See [RunQuality]. */
+    public fun quality(): RunQuality? = RunQuality.assess(this)
 
     /** Where the run launched, from the GPS fix closest before the launch. */
     val startLocation: Coordinate?

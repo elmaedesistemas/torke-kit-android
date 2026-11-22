@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 import today.torke.kit.engine.Coordinate
 import today.torke.kit.engine.DragDistance
 import today.torke.kit.engine.DragMark
+import today.torke.kit.engine.IntervalResult
 import today.torke.kit.engine.RunResult
 
 /** Where a run is. */
@@ -23,11 +24,23 @@ public sealed interface RunPhase {
     public val isRecording: Boolean get() = this is WaitingStill || this is Armed || this is Running
 }
 
+/** What a run measures. */
+public sealed interface RunMode {
+    /** From a standstill: 60 ft, 1/8, 1/4, 0–100. The default. */
+    public data object StandingStart : RunMode
+    /** Already moving: from [fromKmh] to [toKmh], such as 60–130 km/h. */
+    public data class Rolling(val fromKmh: Double = 60.0, val toKmh: Double = 130.0) : RunMode
+    /** From [fromKmh] to a stop, such as 100–0 km/h. */
+    public data class Braking(val fromKmh: Double = 100.0) : RunMode
+}
+
 /** Why a run could not be measured. */
 @Serializable
 public enum class RunFailure {
     /** The run ended without a launch from a standstill. */
     noLaunch,
+    /** A rolling or braking run that did not cover its speed range. */
+    noInterval,
     /** The device has no motion sensors (or they are off). */
     noMotionSensors,
     /** The app is not allowed to use the location. */
@@ -45,6 +58,8 @@ public sealed interface RunEvent {
     /** A live estimate of a mark, from the GPS alone. The official times come in [Finished]. */
     public data class Passed(val mark: DragMark, val elapsed: Double) : RunEvent
     public data class Finished(val result: RunResult) : RunEvent
+    /** A rolling or braking run is done. */
+    public data class IntervalFinished(val result: IntervalResult) : RunEvent
     public data class Failed(val failure: RunFailure) : RunEvent
 }
 
@@ -63,8 +78,11 @@ public data class RunSnapshot(
     val location: Coordinate? = null,
     /** Where the run launched. Send it to your server to decide where the run counts. */
     val startLocation: Coordinate? = null,
-    /** The official times, once [phase] is [RunPhase.Finished]. */
+    val mode: RunMode = RunMode.StandingStart,
+    /** The official times of a standing start, once [phase] is [RunPhase.Finished]. */
     val result: RunResult? = null,
+    /** The result of a rolling or braking run, once [phase] is [RunPhase.Finished]. */
+    val interval: IntervalResult? = null,
 ) {
     val speedKmh: Double get() = speed * 3.6
 }
@@ -90,4 +108,6 @@ public data class RunSessionOptions(
     val backOffRatio: Double = 0.6,
     /** …or after this long (seconds). */
     val maxDuration: Double = 40.0,
+    /** How far past the launch the analysis reads, in meters. Raise it for the 1/2 mile (together with [finishDistance]). */
+    val analysisDistance: Double = DragDistance.QUARTER_MILE + 20,
 )

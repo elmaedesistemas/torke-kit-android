@@ -14,6 +14,7 @@ import today.torke.kit.engine.AxisCalibration
 import today.torke.kit.engine.DragDistance
 import today.torke.kit.engine.DragMark
 import today.torke.kit.engine.GPSSample
+import today.torke.kit.engine.IntervalAnalyzer
 import today.torke.kit.engine.RawMotionSample
 import today.torke.kit.engine.RunAnalyzer
 import today.torke.kit.engine.RunResult
@@ -78,17 +79,25 @@ public class RunSession(public var options: RunSessionOptions = RunSessionOption
 
     // Run
 
-    /** Starts recording. The timer starts by itself when the car launches from a standstill. */
-    public fun arm() {
+    /**
+     * Starts recording. In a standing start the timer starts by itself when the car launches
+     * from a standstill; rolling and braking runs record from now and finish by themselves once
+     * the speed range is covered.
+     */
+    public fun arm(mode: RunMode = RunMode.StandingStart) {
         clear()
         recordedAt = Instant.now()
-        state = state.copy(phase = RunPhase.WaitingStill)
+        state = state.copy(mode = mode, phase = if (mode == RunMode.StandingStart) RunPhase.WaitingStill else RunPhase.Armed)
     }
 
     /** Ends the run now and computes the times. Without a launch it fails with [RunFailure.noLaunch]. */
     public fun finish(): RunResult? {
         if (!state.phase.isRecording) return state.result
-        val result = if (state.phase is RunPhase.Running) RunAnalyzer.analyze(AxisCalibration.forwardAccel(motion), gps) else null
+        if (state.mode != RunMode.StandingStart) {
+            finishInterval()
+            return null
+        }
+        val result = if (state.phase is RunPhase.Running) RunAnalyzer.analyze(AxisCalibration.forwardAccel(motion), gps, options.analysisDistance) else null
         if (result == null) {
             fail(RunFailure.noLaunch)
             return null
@@ -96,6 +105,17 @@ public class RunSession(public var options: RunSessionOptions = RunSessionOption
         state = state.copy(result = result, phase = RunPhase.Finished)
         emit(RunEvent.Finished(result))
         return result
+    }
+
+    private fun finishInterval() {
+        val result = when (val mode = state.mode) {
+            is RunMode.Rolling -> IntervalAnalyzer.rolling(motion, gps, mode.fromKmh, mode.toKmh)
+            is RunMode.Braking -> IntervalAnalyzer.braking(motion, gps, mode.fromKmh)
+            RunMode.StandingStart -> null
+        }
+        if (result == null) return fail(RunFailure.noInterval)
+        state = state.copy(interval = result, phase = RunPhase.Finished)
+        emit(RunEvent.IntervalFinished(result))
     }
 
     /** Drops the run and goes back to [RunPhase.Idle]. */
@@ -109,7 +129,7 @@ public class RunSession(public var options: RunSessionOptions = RunSessionOption
 
     /** Everything recorded since [arm], ready to save, share or replay with [today.torke.kit.input.RecordedRunProvider]. */
     public fun recording(device: String? = null, app: String? = null): TorkeRun =
-        TorkeRun(recordedAt = recordedAt?.toString(), device = device, app = app, motion = motion.toList(), gps = gps.toList(), result = state.result)
+        TorkeRun(recordedAt = recordedAt?.toString(), device = device, app = app, motion = motion.toList(), gps = gps.toList(), result = state.result, interval = state.interval)
 
     // Samples
 
@@ -122,6 +142,7 @@ public class RunSession(public var options: RunSessionOptions = RunSessionOption
     public fun process(sample: RawMotionSample): List<RunEvent> {
         if (!state.phase.isRecording) return emptyList()
         motion.add(sample)
+        if (state.mode != RunMode.StandingStart) return processInterval(sample)
         val events = mutableListOf<RunEvent>()
         val o = options
 
@@ -167,6 +188,24 @@ public class RunSession(public var options: RunSessionOptions = RunSessionOption
         return events
     }
 
+    /** Rolling and braking: record from the first sample, finish once the range is covered. */
+    private fun processInterval(sample: RawMotionSample): List<RunEvent> {
+        if (state.phase == RunPhase.Armed) state = state.copy(phase = RunPhase.Running(sample.t))
+        val phase = state.phase as? RunPhase.Running ?: return emptyList()
+        state = state.copy(elapsed = sample.t - phase.start)
+        val kmh = state.speedKmh
+        val done = when (val mode = state.mode) {
+            is RunMode.Rolling -> kmh >= mode.toKmh + 3
+            is RunMode.Braking -> peakSpeed * 3.6 >= mode.fromKmh && kmh < 1.5
+            RunMode.StandingStart -> false
+        }
+        if (done || state.elapsed > maxOf(options.maxDuration, 60.0)) {
+            finish()
+            return listOf(state.interval?.let { RunEvent.IntervalFinished(it) } ?: RunEvent.Failed(RunFailure.noInterval))
+        }
+        return emptyList()
+    }
+
     public fun process(sample: GPSSample): List<RunEvent> {
         var next = state
         sample.horizontalAccuracy?.let { next = next.copy(gpsAccuracy = it) }
@@ -177,6 +216,11 @@ public class RunSession(public var options: RunSessionOptions = RunSessionOption
         state = state.copy(speed = sample.speed)
         if (!state.phase.isRecording) return emptyList()
 
+        if (state.mode != RunMode.StandingStart) {
+            peakSpeed = maxOf(peakSpeed, sample.speed)
+            gps.add(sample)
+            return emptyList()
+        }
         val events = mutableListOf<RunEvent>()
         // Rolling before the launch: wait for a standstill again
         if (state.phase == RunPhase.Armed && sample.speed >= options.stillSpeed) disarm(events)

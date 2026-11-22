@@ -66,6 +66,7 @@ public class PhoneSensorProvider(context: Context) : RunDataProvider {
                 latitude = fix.latitude,
                 longitude = fix.longitude,
                 horizontalAccuracy = if (fix.hasAccuracy()) fix.accuracy.toDouble() else null,
+                altitude = if (fix.hasAltitude()) fix.altitude else null,
             )))
         }
 

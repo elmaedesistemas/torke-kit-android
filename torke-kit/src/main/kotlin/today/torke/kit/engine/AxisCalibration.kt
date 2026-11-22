@@ -18,6 +18,26 @@ public object AxisCalibration {
         return horizontal.map { (t, h) -> MotionSample(t, h dot forward) }
     }
 
+    /**
+     * Like [forwardAccel], but checks the sign against the GPS: if the integrated acceleration
+     * goes against the GPS speed change, the axis is flipped. Use it when the first strong
+     * push may be a braking.
+     */
+    public fun forwardAccel(raw: List<RawMotionSample>, orientedBy: List<GPSSample>): List<MotionSample> {
+        val forward = forwardAccel(raw)
+        val fixes = orientedBy.filter { it.hasSpeed }.sortedBy { it.t }
+        val first = fixes.firstOrNull() ?: return forward
+        val last = fixes.last()
+        if (kotlin.math.abs(last.speed - first.speed) <= 2) return forward
+        var integrated = 0.0
+        for (i in 1 until forward.size) {
+            val a = forward[i - 1]
+            val b = forward[i]
+            if (a.t >= first.t && b.t <= last.t) integrated += a.accel * (b.t - a.t)
+        }
+        return if (integrated * (last.speed - first.speed) < 0) forward.map { MotionSample(it.t, -it.accel) } else forward
+    }
+
     /** Horizontal acceleration in any direction (m/s²): detects movement before "forward" is known. */
     public fun horizontalMagnitude(s: RawMotionSample): Double = horizontalPart(s).length
 
