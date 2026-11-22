@@ -12,6 +12,8 @@ has the same API, the same results and reads the same files.
 > velocidades) a partir del acelerómetro y el GPS. Es el motor de Torke, abierto para quien
 > quiera construir apps de cronometraje, herramientas para pistas o productos para carros.
 
+📖 **Documentation:** [developers.torke.today](https://developers.torke.today), in Spanish: guides, the full API with Swift and Kotlin side by side, and interactive labs for the session, weather and 4-link geometry.
+
 | Module | What it has | Depends on |
 | --- | --- | --- |
 | `torke-kit` | Engine, `RunSession`, `torke.run` format, `RecordedRunProvider`, `DemoRun` | Kotlin (JVM), coroutines, kotlinx.serialization |
